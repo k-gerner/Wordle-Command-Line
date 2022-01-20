@@ -6,4 +6,4 @@ The objective of the game is to guess the five-letter word correctly in 6 tries.
 
 Here is an example of a full playthrough of one round of Wordle:  
   
-<img src="https://github.com/k-gerner/Game-Pigeon-Solvers/blob/master/Images/Wordle/sampleGamePlaythrough.png" alt = "playthrough on terminal" width="90%" align = "center">  
+<img src="https://github.com/k-gerner/Game-Pigeon-Solvers/blob/master/Images/Wordle/sampleGamePlaythrough.png" alt = "playthrough on terminal" width="90%" align = "left">  
