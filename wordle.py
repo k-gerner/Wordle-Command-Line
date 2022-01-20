@@ -7,11 +7,11 @@ POSSIBLE_ANSWERS = [] # all words that could still be valid guesses according to
 
 CORRECT, WRONG_SPOT, INCORRECT, UNGUESSED = 1, 2, 3, 4
 
-GREEN = '\033[92m' # green
-YELLOW = "\u001b[38;5;226m" # yellow
-WHITE = '\033[0m' # white
-CYAN = "\033[36m" # cyan
-RED = '\033[91m' # red
+GREEN = '\033[92m'
+YELLOW = '\u001b[38;5;226m'
+WHITE = '\033[0m'
+CYAN = '\033[36m'
+RED = '\033[91m'
 
 HISTORY_FILE = 'history.txt'
 
@@ -69,7 +69,7 @@ def get_user_guess(info_dict:dict) -> str:
 	return guess
 
 
-def print_help_menu():
+def print_help_menu() -> None:
 	'''Prints out instructions'''
 	print("\nEach game, you have 6 tries to guess the 5 letter word.")
 	print("After each guess, the letters you guessed will be color coded depending on whether or not they are in the word.")
@@ -142,7 +142,7 @@ def tally_game(win:bool) -> Tuple[int, int]:
 	
 
 
-def main():
+def main() -> None:
 	os.system("") # allows colored terminal to work on Windows OS
 	print("Welcome to Wordle!")
 	build_word_collections('allowed_guesses.txt', 'answers.txt')
@@ -174,7 +174,6 @@ def main():
 			scores, win = evaluate_guess(guess, answer)
 			previous_guesses.append(guess)
 			previous_scores.append(scores)
-			# update_letters_info(letters_info, guess, scores)
 			for i in range(5):
 				letters_info[guess[i]] = min(letters_info[guess[i]], scores[i])
 			print_words_with_color(previous_guesses, previous_scores)
