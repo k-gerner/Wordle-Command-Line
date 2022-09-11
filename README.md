@@ -19,8 +19,10 @@ Here is an example of a full playthrough of one round of
 Wordle:
 
 With eraseMode ON:  
+
 <img src="https://github.com/k-gerner/Wordle-Command-Line/blob/master/Images/duringPlay_eraseModeOn.png" alt = "during the game" width="450%" align = "left">
 <img src="https://github.com/k-gerner/Wordle-Command-Line/blob/master/Images/gameOver_eraseModeOn.png" alt = "end of the game" width="45%">  
 
 With eraseMode OFF:
+
 <img src="https://github.com/k-gerner/Wordle-Command-Line/blob/master/Images/sampleGamePlaythrough_eraseModeOff.png" alt = "playthrough on terminal" width="90%" align = "left"> 
