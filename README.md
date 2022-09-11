@@ -21,7 +21,7 @@ Wordle:
 **With eraseMode ON:**
 
 <img src="https://github.com/k-gerner/Wordle-Command-Line/blob/main/Images/duringPlay_eraseModeOn.png" alt = "during the game" width="50%" align = "left">
-<img src="https://github.com/k-gerner/Wordle-Command-Line/blob/main/Images/gameOver_eraseModeOn.png" alt = "end of the game" width="45%">  
+<img src="https://github.com/k-gerner/Wordle-Command-Line/blob/main/Images/gameOver_eraseModeOn.png" alt = "end of the game" width="50%">  
 
 **With eraseMode OFF:**
 
