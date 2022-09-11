@@ -20,8 +20,8 @@ Wordle:
 
 **With eraseMode ON:**
 
-<img src="https://github.com/k-gerner/Wordle-Command-Line/blob/main/Images/duringPlay_eraseModeOn.png" alt = "during the game" width="49%" align = "left">
-<img src="https://github.com/k-gerner/Wordle-Command-Line/blob/main/Images/gameOver_eraseModeOn.png" alt = "end of the game" width="49%">  
+<img src="https://github.com/k-gerner/Wordle-Command-Line/blob/main/Images/duringPlay_eraseModeOn.png" alt = "during the game" width="47%" align = "left">
+<img src="https://github.com/k-gerner/Wordle-Command-Line/blob/main/Images/gameOver_eraseModeOn.png" alt = "end of the game" width="47%">  
 
 **With eraseMode OFF:**
 
