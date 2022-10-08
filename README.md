@@ -13,7 +13,10 @@ correct spot or not.
 By default, the output will update in place. However, if you 
 would like to preserve all output to the terminal, you can 
 add the command line argument `-e` or `-eraseModeOff` when 
-starting the program.
+starting the program. You can also choose to enable hard 
+mode by adding the command line argument `-h` or `-hardMode`. 
+With hard mode enabled, if a letter is marked yellow or 
+green, you must use it in all future guesses. 
 
 Here is an example of a full playthrough of one round of 
 Wordle:
