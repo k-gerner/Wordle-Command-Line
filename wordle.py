@@ -1,29 +1,28 @@
+try:
+    from curses import wrapper
+except ImportError:
+    print("""
+    This program uses the Python curses module for cleaner command line printing.
+    Unfortunately, this is not available on Windows operating systems.
+    Please instead use v1.1.0, which is the latest available version of the program
+    that does not use the curses module:
+    https://github.com/k-gerner/Wordle-Command-Line/releases/tag/v1.1.0
+    """)
+    quit()
+
 import os
 import sys
 import random
-from typing import List, Tuple
+from typing import Tuple
 from collections import defaultdict
+from printutil import PrintMode
+from wordle_printer import WordlePrinter
+from board import *
 
 VALID_GUESSES = set()  # all 5 letter words
 POSSIBLE_ANSWERS = []  # all words that could still be valid guesses according to previous letter scores
-ANSWER = None
-
-CORRECT, WRONG_SPOT, INCORRECT, UNGUESSED = 1, 2, 3, 4
-
-GREEN = '\033[92m'
-YELLOW = '\033[93m'
-WHITE = '\033[0m'
-CYAN = '\033[36m'
-RED = '\033[91m'
-CURSOR_UP_ONE = '\033[1A'
-ERASE_LINE = '\033[2K'
-ERROR_SYMBOL = f"{RED}<!>{WHITE}"
-INFO_SYMBOL = f"{CYAN}<!>{WHITE}"
 
 HISTORY_FILE = 'history.txt'
-
-ERASE_MODE_ON = True
-HARD_MODE = False
 
 
 def build_word_collections(guesses_filename: str, answers_filename: str) -> None:
@@ -37,41 +36,39 @@ def build_word_collections(guesses_filename: str, answers_filename: str) -> None
             POSSIBLE_ANSWERS.append(word.strip().lower())
 
 
-def evaluate_guess(guess: str) -> Tuple[List[int], bool]:
-    """Evaluates the guess and returns a score for each letter, and whether the guess was correct"""
-    assert len(guess) == 5, "The guess could not be evaluated because it was not 5 letters long!"
-    assert ANSWER is not None, "The guess could not be evaluated because the answer has not been set yet!"
-    scores = [INCORRECT] * 5
-    modified_answer = ANSWER
-    incorrect_indexes = []
+def evaluate_guess(guess_str: str, answer: str) -> Guess:
+    """
+    Evaluates the guess and returns a Guess object, which contains (in part)
+    a list of scores corresponding to each letter.
+    """
     # first check for all the correctly guessed letters
     # This must be done before checking for wrong spot / incorrect letters
-    for i in range(len(guess)):
-        if guess[i] == ANSWER[i]:
-            scores[i] = CORRECT
-            modified_answer = modified_answer[:i] + "_" + modified_answer[i + 1:]
+    guess_obj = Guess(guess_str)
+    for i, guessed_char in enumerate(guess_str):
+        if guessed_char == answer[i]:
+            guess_obj.set_score(i, CORRECT)
+            answer = answer[:i] + "_" + answer[i + 1:]
         else:
-            incorrect_indexes.append(i)
-    if len(incorrect_indexes) == 0:
-        return scores, True
-    for i in incorrect_indexes:
-        if guess[i] in modified_answer:
-            scores[i] = WRONG_SPOT
-            true_location = modified_answer.index(guess[i])
-            modified_answer = modified_answer[:true_location] + "_" + modified_answer[true_location + 1:]
-    return scores, False
+            guess_obj.set_score(i, INCORRECT)
+    for i in guess_obj.get_inaccurate_indices():
+        if guess_str[i] in answer:
+            guess_obj.set_score(i, WRONG_SPOT)
+            true_location = answer.index(guess_str[i])
+            answer = answer[:true_location] + "_" + answer[true_location + 1:]
+    return guess_obj
 
 
-def is_valid_hard_mode_guess(word, previous_guess):
+def is_valid_hard_mode_guess(board, word, answer) -> bool:
     """Checks if the word is a valid guess in hard mode"""
-    scores, is_correct = evaluate_guess(word)
-    if is_correct:
+    guess_obj = evaluate_guess(word, answer)
+    if guess_obj.is_correct():
         return True
-    previous_scores, _ = evaluate_guess(previous_guess)
+    previous_guess_obj = board.most_recent_guess()
+    previous_guess_str = previous_guess_obj.word
     new_letters_to_num_found = defaultdict(int)   # [letter, count]
-    prev_yellow_letters_count = defaultdict(int)  # [letter, count]
-    for index, prev_letter_score in enumerate(previous_scores):
-        new_score_at_index = scores[index]
+    prev_yellow_letters_counts = defaultdict(int)  # [letter, count]
+    for index, prev_letter_score in enumerate(previous_guess_obj.scores):
+        new_score_at_index = guess_obj.scores[index]
         if prev_letter_score == CORRECT:
             if new_score_at_index != CORRECT:
                 return False
@@ -79,116 +76,37 @@ def is_valid_hard_mode_guess(word, previous_guess):
                 # if both correct, don't add to dicts
                 continue
         elif prev_letter_score == WRONG_SPOT:
-            prev_yellow_letters_count[previous_guess[index]] += 1
+            prev_yellow_letters_counts[previous_guess_str[index]] += 1
 
         if new_score_at_index in [CORRECT, WRONG_SPOT]:
             new_letters_to_num_found[word[index]] += 1
 
-    for prev_letter, num_yellow in prev_yellow_letters_count.items():
+    for prev_letter, num_yellow in prev_yellow_letters_counts.items():
         if new_letters_to_num_found[prev_letter] < num_yellow:
             return False
     return True
 
 
-def get_user_guess(info_dict: dict, previous_guesses: List[str]) -> str:
+def get_user_guess(board, printer, hard_mode, answer) -> str:
     """Gets the guess word from the user"""
-    if ERASE_MODE_ON:
-        guess = input("Type your guess:\t").strip().lower()
-        erase_previous_lines(1)
-    else:
-        guess = input("Type your guess, or type 'i' for info about which letters remain:  ").strip().lower()
+    guess = printer.get_input("Type your guess (or 'q' to quit):\t").strip().lower()
     while True:
-        if guess == 'i' and not ERASE_MODE_ON:
-            print_color_meanings()
-            print()
-            print_letters_info(info_dict)
-            guess = input("Type your guess:  ").strip().lower()
-        elif guess == 'q':
-            print("Thanks for playing! Have a nice day!")
+        if guess == 'q':
             quit()
         elif guess == "" or len(guess) != 5:
-            guess = input(f"{ERROR_SYMBOL} Must be 5 letters. Try again:  ").strip().lower()
-            erase_previous_lines(1)
-        elif guess in previous_guesses:
-            guess = input(f"{ERROR_SYMBOL} You've already guessed that word. Try again:  ").strip().lower()
-            erase_previous_lines(1)
+            guess = printer.get_input("Must be 5 letters. Try again:  ", print_mode=PrintMode.ERROR).strip().lower()
+        elif board.guessed_already(guess):
+            guess = printer.get_input("You've already guessed that word. Try again:  ", print_mode=PrintMode.ERROR).strip().lower()
         elif not guess.isalpha():
-            guess = input(f"{ERROR_SYMBOL} Must only contain letters. Try again:  ").strip().lower()
-            erase_previous_lines(1)
+            guess = printer.get_input("Must only contain letters. Try again:  ", print_mode=PrintMode.ERROR).strip().lower()
         elif guess not in VALID_GUESSES:
-            guess = input(f"{ERROR_SYMBOL} Not a valid word. Try again:  ").strip().lower()
-            erase_previous_lines(1)
-        elif HARD_MODE and len(previous_guesses) >= 1 and not is_valid_hard_mode_guess(guess, previous_guesses[-1]):
-            print(f"{ERROR_SYMBOL} Since you're in hard mode, you must use all letters found already.")
-            guess = input("Try again:  ").strip().lower()
-            erase_previous_lines(2)
+            guess = printer.get_input("Not a valid word. Try again:  ", print_mode=PrintMode.ERROR).strip().lower()
+        elif hard_mode and board.num_guesses() >= 1 and not is_valid_hard_mode_guess(board, guess, answer):
+            text = "Since you're in hard mode, you must use all letters found already. Try again:\t"
+            guess = printer.get_input(text, print_mode=PrintMode.ERROR).strip().lower()
         else:
             break
     return guess
-
-
-def print_help_menu() -> None:
-    """Prints out instructions"""
-    print("\nEach game, you have 6 tries to guess the 5 letter word.")
-    print(
-        "After each guess, the letters you guessed will be color coded depending on whether or not they are "
-        "in the word.")
-    print("For example, if you typed 'codes', the output may look something like this:\n")
-    print(f"{YELLOW}C {GREEN}O {WHITE}D E {GREEN}S{WHITE}\n")
-    print(
-        "This would indicate that 'O' and 'S' are in the correct positions, 'C' is in the word, but not in "
-        "the right spot, and 'D' & 'E' are not in the word.")
-    print(
-        "Therefore, a smart next guess might be 'LOCKS' because 'O' and 'S' are in the same positions, "
-        "and 'C' is in a different position.")
-    print("Good luck!\n")
-
-
-def print_color_meanings() -> None:
-    """Print out what each letter coloring means"""
-    print(f"{GREEN}Green{WHITE} = Correct spot\n" +
-          f"{YELLOW}Yellow{WHITE} = Incorrect spot\n" +
-          f"{RED}Red{WHITE} = Does not appear\n" +
-          "White = Unguessed")
-
-
-def print_letters_info(info_dict: dict) -> None:
-    """Prints out the letters colored accordingly"""
-    output = ""
-    for letter in info_dict.keys():
-        letter_status = info_dict[letter]
-        if letter_status == CORRECT:
-            color = GREEN
-        elif letter_status == WRONG_SPOT:
-            color = YELLOW
-        elif letter_status == INCORRECT:
-            color = RED
-        else:
-            color = WHITE
-        output += f"{color}{letter.upper()}{WHITE} "
-    print(output.strip() + '\n')
-
-
-def print_words_with_color(words_list: List[str], scores_lists: List[List[int]], extra_lines=0) -> None:
-    """Prints out the words with the letters color coded properly"""
-    print()
-    for word_index in range(len(words_list)):
-        formatted_word = ""
-        word = words_list[word_index].upper()
-        scores = scores_lists[word_index]
-        for letter_index in range(len(word)):
-            letter = word[letter_index]
-            letter_score = scores[letter_index]
-            if letter_score == CORRECT:
-                color = GREEN
-            elif letter_score == WRONG_SPOT:
-                color = YELLOW
-            else:
-                color = WHITE
-            formatted_word += f"{color}{letter}{WHITE} "
-        print(formatted_word.strip())
-    for _ in range(extra_lines): print()
-    print()
 
 
 def tally_game(win: bool) -> Tuple[int, int]:
@@ -211,167 +129,57 @@ def tally_game(win: bool) -> Tuple[int, int]:
     return num_wins, total_games
 
 
-def play_with_erase_mode(previous_answers=None, answer=None):
-    """Play the game with erase mode functionality"""
-    global ANSWER
-    if previous_answers is None:
-        print_color_meanings()
-        previous_answers = []
-    letters_info = {}
-    for letter in 'abcdefghijklmnopqrstuvwxyz':
-        letters_info[letter] = UNGUESSED
+def play_game(board, printer, hard_mode, previous_answers, answer=None) -> None:
+    """Play the game from start to finish"""
     if not answer:
-        ANSWER = random.choice(POSSIBLE_ANSWERS).lower()
-        while ANSWER in previous_answers:
-            ANSWER = random.choice(POSSIBLE_ANSWERS).lower()
-        previous_answers.append(ANSWER)
-    else:
-        ANSWER = answer
-    previous_guesses = []
-    previous_scores = []
-    winning_turn = -1
+        answer = random.choice(POSSIBLE_ANSWERS).lower()
+        while answer in previous_answers:
+            answer = random.choice(POSSIBLE_ANSWERS).lower()
+        previous_answers.append(answer)
+    game_won = False
+    printer.show_all_windows(board)
     for turn in range(6):
-        print_words_with_color(previous_guesses, previous_scores, 6 - turn)
-        print_letters_info(letters_info)
-        print("You have %d turn%s left!" % (6 - turn, "s" if turn < 5 else ""))
-        guess = get_user_guess(letters_info, previous_guesses)
-        scores, win = evaluate_guess(guess)
-        previous_guesses.append(guess)
-        previous_scores.append(scores)
-        erase_previous_lines(11)
-        for i in range(5):
-            letters_info[guess[i]] = min(letters_info[guess[i]], scores[i])
-        if win:
-            winning_turn = turn + 1
+        printer.show_all_windows(board)
+        guess_str = get_user_guess(board, printer, hard_mode, answer)
+        guess_obj = evaluate_guess(guess_str, answer)
+        board.add_guess(guess_obj)
+        printer.update_board(board)
+        if guess_obj.is_correct():
+            game_won = True
             break
-    print_words_with_color(previous_guesses, previous_scores)
-    game_won = (winning_turn != -1)
     num_wins, num_games = tally_game(game_won)
     if game_won:
-        print("Congratulations! You guessed correctly in %d %s!" % (
-            winning_turn, "tries" if winning_turn > 1 else "try"))
+        printer.show_win_message(board)
     else:
-        replay = input(
-            "Looks like you didn't guess correctly!\nWould you like to replay with the same word? ("
-            "y/n):  ").strip().lower()
-        erase_previous_lines(2)
+        printer.show_loss_message()
+        replay = printer.get_input("Would you like to replay with the same word? (y/n):  ", clear_after=True).strip().lower()
         if replay == 'y':
-            erase_previous_lines(2 + (winning_turn if winning_turn > 0 else 6))
-            play_with_erase_mode(previous_answers, ANSWER)
-        print()
-    print("You have won %d of %d games (%d%%)" % (num_wins, num_games, int((num_wins / num_games) * 100)))
-    print("Type one of the following options:")
-    print("- 'r' for replay with a new word")
-    print("- 's' to show the correct answer")
-    print("- 'q' to quit")
-    user_input = input("Which option will you choose?  ").strip().lower()
-    erase_previous_lines(1)
+            printer.erase_all_windows()
+            play_game(Board(), printer, hard_mode, previous_answers, answer)
+    user_input = printer.get_end_game_input(num_wins, num_games).strip().lower()
     while True:
         if user_input == 'r':
-            erase_previous_lines(8 + (winning_turn if winning_turn > 0 else 6))
-            play_with_erase_mode(previous_answers)
+            printer.erase_all_windows()
+            play_game(Board(), printer, hard_mode, previous_answers)
         elif user_input == 's':
-            print(f"The correct answer was: {CYAN}%s{WHITE}" % ANSWER.upper())
-            user_input = input("Which option will you choose?  ").strip().lower()
-            erase_previous_lines(2)
+            printer.show_answer(answer)
+            user_input = printer.get_end_game_input(num_wins, num_games).strip().lower()
         elif user_input == 'q':
-            print("Thanks for playing! Have a nice day!")
             quit()
         else:
-            user_input = input("Invalid input. Try again:  ").strip().lower()
-            erase_previous_lines(1)
+            printer.show_invalid_end_game_input()
+            user_input = printer.get_end_game_input(num_wins, num_games).strip().lower()
 
 
-def play_with_erase_mode_off():
-    """Play the game without erase mode functionality"""
-    global ANSWER
-    replay_word = False
-    previous_answers = []
-    while True:
-        letters_info = {}
-        for letter in 'abcdefghijklmnopqrstuvwxyz':
-            letters_info[letter] = UNGUESSED
-        if replay_word:
-            ANSWER = previous_answers[-1]
-            replay_word = False
-        else:
-            ANSWER = random.choice(POSSIBLE_ANSWERS).lower()
-            while ANSWER in previous_answers:
-                ANSWER = random.choice(POSSIBLE_ANSWERS).lower()
-            previous_answers.append(ANSWER)
-        previous_guesses = []
-        previous_scores = []
-        winning_turn = -1
-        for turn in range(6):
-            print("You have %d turn%s left!" % (6 - turn, "s" if turn < 5 else ""))
-            guess = get_user_guess(letters_info, previous_guesses)
-            scores, win = evaluate_guess(guess)
-            previous_guesses.append(guess)
-            previous_scores.append(scores)
-            for i in range(5):
-                letters_info[guess[i]] = min(letters_info[guess[i]], scores[i])
-            print_words_with_color(previous_guesses, previous_scores)
-            if win:
-                winning_turn = turn + 1
-                break
-        game_won = (winning_turn != -1)
-        num_wins, num_games = tally_game(game_won)
-        if game_won:
-            print("Congratulations! You guessed correctly in %d %s!" % (
-                winning_turn, "tries" if winning_turn > 1 else "try"))
-        else:
-            replay = input(
-                "Looks like you didn't guess correctly!\nWould you like to replay with the same word? ("
-                "y/n):  ").strip().lower()
-            if replay == 'y':
-                replay_word = True
-                continue
-        print("You have won %d of %d games (%d%%)" % (num_wins, num_games, int((num_wins / num_games) * 100)))
-        print("Type one of the following options:")
-        print("- 'r' for replay with a new word")
-        print("- 's' to show the correct answer")
-        print("- 'q' to quit")
-        user_input = input("Which option will you choose?  ").strip().lower()
-        while True:
-            if user_input == 'r':
-                break
-            elif user_input == 's':
-                print(f"The correct answer was: {CYAN}%s{WHITE}" % ANSWER.upper())
-                user_input = input("Which option will you choose?  ").strip().lower()
-            elif user_input == 'q':
-                print("Thanks for playing! Have a nice day!")
-                quit()
-            else:
-                user_input = input("Invalid input. Try again:  ").strip().lower()
-
-
-def erase_previous_lines(num_lines, override_erase_mode=False):
-    """Erases the specified previous number of lines from the terminal"""
-    erase_mode = ERASE_MODE_ON if not override_erase_mode else (not ERASE_MODE_ON)
-    if erase_mode:
-        print(f"{CURSOR_UP_ONE}{ERASE_LINE}" * max(num_lines, 0), end='')
-
-
-def main() -> None:
-    global ERASE_MODE_ON, HARD_MODE
-    os.system("")  # allows colored terminal to work on Windows OS
-    print("\nWelcome to Wordle!")
-    if "-h" in sys.argv or "-hardMode" in sys.argv:
-        HARD_MODE = True
-        print(f"{INFO_SYMBOL} You are playing in hard mode!")
+def main(stdscr) -> None:
+    printer = WordlePrinter(stdscr)
     build_word_collections('allowed_guesses.txt', 'answers.txt')
-    user_input = input("\nType 'h' for the help menu, or ENTER when you are ready to play!  ").strip().lower()
-    if user_input == 'h':
-        print_help_menu()
-    else:
-        print()
-    if "-e" in sys.argv or "-eraseModeOff" in sys.argv:
-        ERASE_MODE_ON = False
-        play_with_erase_mode_off()
-    else:
-        ERASE_MODE_ON = True
-        play_with_erase_mode()
+    hard_mode = False
+    if "-h" in sys.argv or "-hardMode" in sys.argv:
+        hard_mode = True
+    printer.show_startup_prompt(stdscr, hard_mode)
+    play_game(Board(), printer, hard_mode, [])
 
 
 if __name__ == '__main__':
-    main()
+    wrapper(main)
