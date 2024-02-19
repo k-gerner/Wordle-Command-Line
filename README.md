@@ -17,6 +17,11 @@ The objective of the game is to guess the five-letter word
 correctly in 6 tries. After each guess, you will be told 
 which of the letters are in the word and if they are in the 
 correct spot or not. 
+
+To use, run the `wordle.py` file as follows:
+```
+> python3 wordle.py
+```
 You can also choose to enable hard mode by adding the command 
 line argument `-h` or `-hardMode`. With hard mode enabled, 
 if a letter is marked yellow or green, you must use it in all 
