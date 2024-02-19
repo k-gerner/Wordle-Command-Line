@@ -27,6 +27,6 @@ program, the output will be cleared from the screen.
 Here is an example of a full playthrough of Wordle using the
 program, using regular mode, and then hard mode:
 
-<img src="https://github.com/k-gerner/gif-storage/blob/main/wordle/wordle_demo.gif" alt="Full playthrough of Wordle" width="75%" align="left>
+![](https://github.com/k-gerner/gif-storage/blob/main/wordle/wordle_demo.gif)
 
 ## This is a test
