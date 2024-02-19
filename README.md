@@ -1,4 +1,9 @@
 # Wordle
+> [!NOTE]
+> From v2.0.0, this code uses the Python `curses` module for cleaner 
+> command line printing. This is not available on Windows operating 
+> systems. If you are using Windows, please use v1.1.0 instead.
+
 A version of the newly popular game "Wordle" that is playable 
 from the command line. It uses the same word lists as the 
 official game! Lists found [here](https://gist.github.com/cfreshman/cdcdf777450c5b5301e439061d29694c) 
@@ -19,14 +24,8 @@ future guesses.
 
 The output will update in place. Once the user quits the 
 program, the output will be cleared from the screen.
-> [!NOTE]
-> From v2.0.0, this code uses the Python `curses` module for cleaner 
-> command line printing. This is not available on Windows operating 
-> systems. If you are using Windows, please use v1.1.0 instead.
 
 Here is an example of a full playthrough of Wordle using the
 program, using regular mode, and then hard mode:
 
 ![](https://github.com/k-gerner/gif-storage/blob/main/wordle/wordle_demo.gif)
-
-## This is a test
